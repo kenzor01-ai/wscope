@@ -1,0 +1,217 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * =========================
+ * EXISTING MODELS
+ * =========================
+ */
+
+model Client {
+  id    Int     @id @default(autoincrement())
+  name  String
+  email String  @unique
+  phone String?
+
+  address String?
+  source  ClientSource?
+
+  createdAt DateTime @default(now())
+
+  jobs      Job[]
+  estimates Estimate[] @relation("ClientEstimates") // one-to-many
+}
+
+model Manufacturer {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id             Int          @id @default(autoincrement())
+  name           String
+  manufacturerId Int
+  manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [id])
+
+  jobs Job[]
+}
+
+model Job {
+  id        Int @id @default(autoincrement())
+  clientId  Int
+  productId Int
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}
+
+enum ClientSource {
+  WALK_IN
+  REFERRAL
+  REALTOR
+  BUILDER
+  WEBSITE
+  OTHER
+}
+
+/**
+ * =========================
+ * NEW ESTIMATE SYSTEM
+ * =========================
+ */
+
+model Estimate {
+  id         Int @id @default(autoincrement())
+  estimateNo Int @unique @default(autoincrement())
+
+  status EstimateStatus @default(DRAFT)
+  source ClientSource?
+
+  addressLine1 String?
+  city         String?
+  state        String?
+  zip          String?
+
+  notes String?
+
+  clientId Int?
+  client   Client? @relation("ClientEstimates", fields: [clientId], references: [id])
+
+  items EstimateItem[] @relation("EstimateItems") // one-to-many
+
+  subtotal Decimal? @db.Decimal(10, 2)
+  tax      Decimal? @db.Decimal(10, 2)
+  total    Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EstimateItem {
+  id               Int @id @default(autoincrement())
+  estimateId       Int
+  catalogProductId Int
+
+  estimate Estimate       @relation("EstimateItems", fields: [estimateId], references: [id], onDelete: Cascade)
+  product  CatalogProduct @relation(fields: [catalogProductId], references: [id])
+
+  sqft         Int
+  pricePerSqft Decimal @db.Decimal(10, 2)
+  wasteFactor  Int
+  lineTotal    Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+}
+
+enum EstimateStatus {
+  DRAFT
+  ESTIMATED
+  REVISED
+  MEASURED
+  SOLD
+  LOST
+}
+
+/**
+ * =========================
+ * PRODUCT CATALOG SYSTEM
+ * =========================
+ */
+
+model Brand {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  status    BrandStatus @default(ACTIVE)
+  createdAt DateTime    @default(now())
+
+  collections Collection[]
+}
+
+model Collection {
+  id        Int              @id @default(autoincrement())
+  brandId   Int
+  name      String
+  status    CollectionStatus @default(DRAFT)
+  sourceDoc String?
+
+  brand    Brand            @relation(fields: [brandId], references: [id])
+  products CatalogProduct[]
+
+  @@unique([brandId, name])
+}
+
+model CatalogProduct {
+  id           Int     @id @default(autoincrement())
+  collectionId Int
+  sku          String?
+  name         String
+  grade        String?
+
+  widthIn     Float?
+  thicknessIn Float?
+  lengthIn    Float?
+  wearLayerMm Float?
+
+  installation    InstallationType?
+  radiantApproved Boolean?
+
+  basePriceSf  Decimal @db.Decimal(10, 2)
+  finalPriceSf Decimal @db.Decimal(10, 2)
+
+  status ProductStatus @default(DRAFT)
+
+  collection    Collection     @relation(fields: [collectionId], references: [id])
+  carton        Carton?
+  estimateItems EstimateItem[]
+}
+
+model Carton {
+  id               Int   @id @default(autoincrement())
+  productId        Int   @unique
+  sqftPerCarton    Float
+  cartonsPerPallet Int?
+
+  product CatalogProduct @relation(fields: [productId], references: [id])
+}
+
+model PricingRule {
+  id     Int             @id @default(autoincrement())
+  name   String
+  type   PricingRuleType
+  value  Float
+  active Boolean         @default(true)
+}
+
+enum BrandStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum CollectionStatus {
+  DRAFT
+  LOCKED
+}
+
+enum ProductStatus {
+  DRAFT
+  LOCKED
+}
+
+enum PricingRuleType {
+  FLAT
+  PERCENT
+}
+
+enum InstallationType {
+  TONGUE_GROOVE
+  CLICK
+  GLUE
+}
