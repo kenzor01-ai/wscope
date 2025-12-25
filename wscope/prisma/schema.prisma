@@ -37,3 +37,24 @@ model Job {
   product   Product  @relation(fields: [productId], references: [id])
 }
 
+model Estimate {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  status    String   @default("DRAFT")
+  createdAt DateTime @default(now())
+
+  job       Job      @relation(fields: [jobId], references: [id])
+  items     EstimateItem[]
+}
+
+model EstimateItem {
+  id          Int      @id @default(autoincrement())
+  estimateId  Int
+  name        String
+  quantity    Float
+  unitPrice   Float
+  createdAt   DateTime @default(now())
+
+  estimate    Estimate @relation(fields: [estimateId], references: [id])
+}
+
